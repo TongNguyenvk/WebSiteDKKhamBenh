@@ -5,6 +5,29 @@ import { getDashboardStats, DashboardStats, getPendingSchedules } from '@/lib/ap
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 
+type StatColor = 'blue' | 'green' | 'purple' | 'amber'
+
+interface StatCard {
+    label: string
+    value: number
+    icon: string
+    color: StatColor
+    href: string
+}
+
+interface QuickLinkItem {
+    label: string
+    href: string
+    icon: string
+}
+
+const colorClasses: Record<StatColor, { bg: string; text: string; iconBg: string; border: string }> = {
+    blue: { bg: 'bg-blue-50', text: 'text-blue-600', iconBg: 'bg-blue-100', border: 'border-blue-600' },
+    green: { bg: 'bg-green-50', text: 'text-green-600', iconBg: 'bg-green-100', border: 'border-green-600' },
+    purple: { bg: 'bg-purple-50', text: 'text-purple-600', iconBg: 'bg-purple-100', border: 'border-purple-600' },
+    amber: { bg: 'bg-amber-50', text: 'text-amber-600', iconBg: 'bg-amber-100', border: 'border-amber-600' },
+}
+
 export default function AdminDashboard() {
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [pendingCount, setPendingCount] = useState(0);
@@ -36,26 +59,21 @@ export default function AdminDashboard() {
         );
     }
 
-    const statCards = [
+    const statCards: StatCard[] = [
         { label: 'Tổng người dùng', value: stats?.totalUsers || 0, icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z', color: 'blue', href: '/admin/users' },
         { label: 'Bác sĩ', value: stats?.totalDoctors || 0, icon: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z', color: 'green', href: '/admin/doctors' },
         { label: 'Chuyên khoa', value: stats?.totalSpecialties || 0, icon: 'M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z', color: 'purple', href: '/admin/specialties' },
         { label: 'Lịch khám hôm nay', value: stats?.todayAppointments || 0, icon: '8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', color: 'amber', href: '/admin/appointments' },
     ];
 
-    const quickLinks = [
+    const quickLinks: QuickLinkItem[] = [
         { label: 'Quản lý người dùng', href: '/admin/users', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
         { label: 'Quản lý chuyên khoa', href: '/admin/specialties', icon: 'M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z' },
         { label: 'Quản lý lịch phân công', href: '/admin/schedules', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
         { label: 'Quản lý lịch khám', href: '/admin/appointments', icon: 'M9 5H7a2 2 0 00-2 2v11a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
     ];
 
-    const colorClasses: Record<string, { bg: string; text: string; iconBg: string }> = {
-        blue: { bg: 'bg-blue-50', text: 'text-blue-600', iconBg: 'bg-blue-100' },
-        green: { bg: 'bg-green-50', text: 'text-green-600', iconBg: 'bg-green-100' },
-        purple: { bg: 'bg-purple-50', text: 'text-purple-600', iconBg: 'bg-purple-100' },
-        amber: { bg: 'bg-amber-50', text: 'text-amber-600', iconBg: 'bg-amber-100' },
-    };
+    
 
     return (
         <div className="h-full flex flex-col overflow-auto">
@@ -94,7 +112,7 @@ export default function AdminDashboard() {
                         const colors = colorClasses[stat.color];
                         return (
                             <Link key={stat.label} href={stat.href}>
-                                <div className={`p-4 rounded-xl border transition-all hover:shadow-md cursor-pointer ${colors.bg} border-transparent`}>
+                                <div className={`p-4 rounded-xl border transition-all hover:shadow-md cursor-pointer ${colors.bg} ${colors.border}`}>
                                     <div className="flex items-center justify-between mb-3">
                                         <div className={`p-2 rounded-lg ${colors.iconBg}`}>
                                             <svg className={`w-5 h-5 ${colors.text}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
