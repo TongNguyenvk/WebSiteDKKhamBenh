@@ -1,7 +1,0 @@
-export { authService } from './auth.service'
-export { userService } from './user.service'
-export { specialtyService } from './specialty.service'
-export { doctorService } from './doctor.service'
-export { scheduleService } from './schedule.service'
-export { bookingService } from './booking.service'
-export { allcodeService, TIME_SLOTS, POSITIONS } from './allcode.service'

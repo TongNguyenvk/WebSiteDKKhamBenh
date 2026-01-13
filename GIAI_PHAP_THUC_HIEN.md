@@ -13,10 +13,10 @@ Trong môi trường y tế truyền thống, bệnh nhân thường gặp nhi�
 ### 1.2. Mục Tiêu Hệ Thống
 
 Xây dựng một nền tảng web cho phép:
-- Bệnh nhân đặt lịch khám bệnh trực tuyến 24/7
-- Bác sĩ chủ động đăng ký lịch làm việc
-- Quản trị viên kiểm soát và phê duyệt lịch làm việc
-- Giảm thời gian chờ đợi và nâng cao trải nghiệm khám bệnh
+- **Bệnh nhân chủ động** tạo lịch khám bệnh phù hợp với thời gian rảnh của mình
+- **Bác sĩ theo dõi** danh sách bệnh nhân cần điều trị, tránh tình trạng quá tải
+- **Giảm thời gian chờ đợi** cho bệnh nhân thông qua việc phân bổ lịch hẹn hợp lý
+- **Quản trị viên kiểm soát** và phê duyệt lịch làm việc của bác sĩ
 
 ### 1.3. Phạm Vi Ứng Dụng
 
@@ -832,7 +832,178 @@ flowchart LR
 
 ---
 
-## 5. Tổng Kết
+## 5. Quy Trình Xử Lý Tình Huống Đặc Biệt
+
+### 5.1. Bác Sĩ Nghỉ Ốm / Không Thể Làm Việc
+
+```mermaid
+flowchart TD
+    A[Bác sĩ nghỉ ốm] --> B{Lịch hẹn đã<br/>được xác nhận?}
+    
+    B -->|Chưa xác nhận S1| C[Bác sĩ không nhận lịch]
+    C --> D[Lịch hẹn giữ trạng thái S1]
+    D --> E[Bệnh nhân có thể hủy<br/>và đặt lịch khác]
+    
+    B -->|Đã xác nhận S2| F[Bác sĩ hủy lịch hẹn]
+    F --> G[Chuyển trạng thái → S3]
+    G --> H[Thông báo bệnh nhân<br/>qua Email/SMS]
+    H --> I[Bệnh nhân đặt lịch mới]
+    
+    style A fill:#ffcccc
+    style H fill:#ffffcc
+```
+
+**Quy trình chi tiết:**
+1. **Trường hợp chưa xác nhận (S1)**: Bác sĩ chỉ cần không nhận lịch khám. Bệnh nhân sẽ thấy lịch vẫn ở trạng thái "Chờ xác nhận" và có thể chủ động hủy để đặt lịch với bác sĩ khác.
+2. **Trường hợp đã xác nhận (S2)**: Bác sĩ hoặc Admin hủy lịch hẹn, hệ thống gửi thông báo đến bệnh nhân qua email hoặc số điện thoại đã đăng ký.
+
+### 5.2. Bệnh Nhân Không Đến Khám (No-Show)
+
+```mermaid
+flowchart TD
+    A[Đến giờ khám] --> B{Bệnh nhân<br/>có mặt?}
+    
+    B -->|Có| C[Bác sĩ khám bệnh]
+    C --> D[Cập nhật S4 - Hoàn thành]
+    
+    B -->|Không| E[Hết khung giờ quy định]
+    E --> F[Chuyển trạng thái → S3 Đã hủy]
+    F --> G[Giải phóng slot]
+    
+    G --> H{Bệnh nhân đến<br/>sau giờ?}
+    H -->|Có| I{Trường hợp<br/>đặc biệt?}
+    I -->|Không| J[Không được khám<br/>Cần đặt lịch mới]
+    I -->|Cấp cứu| K[Chuyển qua<br/>khoa Cấp cứu]
+    
+    H -->|Không| L[Kết thúc]
+    
+    style E fill:#ffcccc
+    style K fill:#ccffcc
+```
+
+**Quy tắc xử lý:**
+- Nếu bệnh nhân không đến trong khung giờ quy định → Tự động chuyển trạng thái sang S3 (Đã hủy)
+- Bệnh nhân đến sau giờ → Không được khám, cần đặt lịch mới
+- Trường hợp cấp cứu → Chuyển qua khoa Cấp cứu, không qua hệ thống đặt lịch
+
+### 5.3. Xử Lý Xung Đột Đặt Lịch (Race Condition)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor BN1 as 🧑 Bệnh nhân 1
+    actor BN2 as 🧑 Bệnh nhân 2
+    participant BE as ⚙️ Backend
+    participant DB as 🗄️ Database
+
+    Note over BN1,DB: Tình huống: 2 bệnh nhân đặt cùng slot cuối cùng
+
+    par Đặt lịch đồng thời
+        BN1->>BE: POST /api/bookings (slot cuối)
+        BN2->>BE: POST /api/bookings (slot cuối)
+    end
+
+    BE->>DB: BEGIN TRANSACTION
+    BE->>DB: SELECT ... FOR UPDATE<br/>(Lock row)
+    
+    Note over DB: Row bị khóa, chỉ 1 request được xử lý
+    
+    DB-->>BE: currentNumber = 4, maxNumber = 5
+    BE->>BE: Check: 4 < 5 ✓
+    BE->>DB: INSERT Booking (BN1)
+    BE->>DB: UPDATE currentNumber = 5
+    BE->>DB: COMMIT
+    BE-->>BN1: ✅ Đặt lịch thành công
+
+    Note over DB: Row được mở khóa, request tiếp theo được xử lý
+    
+    BE->>DB: BEGIN TRANSACTION
+    BE->>DB: SELECT ... FOR UPDATE
+    DB-->>BE: currentNumber = 5, maxNumber = 5
+    BE->>BE: Check: 5 < 5 ✗
+    BE->>DB: ROLLBACK
+    BE-->>BN2: ❌ Slot đã đầy
+```
+
+**Cơ chế bảo vệ:**
+- Sử dụng **Database Transaction** với **Row-level Locking** (SELECT ... FOR UPDATE)
+- Đảm bảo chỉ một request được xử lý tại một thời điểm cho cùng một slot
+- Kiểm tra `currentNumber < maxNumber` trong transaction trước khi tạo booking
+
+### 5.4. Quy Trình Đăng Ký và Duyệt Lịch Làm Việc
+
+```mermaid
+flowchart TD
+    A[Bác sĩ đăng ký lịch] --> B{Ngày đăng ký<br/>hợp lệ?}
+    
+    B -->|< Ngày mai| C[❌ Từ chối<br/>Phải đăng ký từ ngày mai]
+    B -->|>= Ngày mai| D[Tạo lịch status=pending]
+    
+    D --> E[Admin nhận thông báo]
+    E --> F{Admin duyệt<br/>trong 1 ngày?}
+    
+    F -->|Duyệt| G[status = approved]
+    G --> H[Hiển thị cho bệnh nhân]
+    
+    F -->|Từ chối| I[status = rejected]
+    I --> J[Bác sĩ đăng ký lại]
+    
+    F -->|Quá hạn| K[⚠️ Cảnh báo Admin]
+    K --> F
+    
+    style C fill:#ffcccc
+    style G fill:#ccffcc
+    style K fill:#ffffcc
+```
+
+**Quy tắc thời gian:**
+| Hành động | Thời gian quy định |
+|-----------|-------------------|
+| Bác sĩ đăng ký lịch | Tối thiểu 1 ngày trước (từ ngày mai trở đi) |
+| Admin duyệt lịch | Trong vòng 1 ngày sau khi bác sĩ đăng ký |
+| Khuyến nghị | Bác sĩ nên đăng ký trước 1 tuần để có thời gian duyệt |
+
+### 5.5. Sơ Đồ Tổng Hợp Luồng Nghiệp Vụ
+
+```mermaid
+flowchart TB
+    subgraph DANG_KY["📅 ĐĂNG KÝ LỊCH LÀM VIỆC"]
+        BS1[Bác sĩ đăng ký] --> |>= ngày mai| P1[Pending]
+        P1 --> |Admin duyệt| A1[Approved]
+        P1 --> |Admin từ chối| R1[Rejected]
+    end
+    
+    subgraph DAT_LICH["📋 ĐẶT LỊCH KHÁM"]
+        A1 --> |Còn slot| BN1[Bệnh nhân đặt]
+        BN1 --> S1[S1: Chờ xác nhận]
+    end
+    
+    subgraph XU_LY["⚙️ XỬ LÝ LỊCH HẸN"]
+        S1 --> |BS xác nhận| S2[S2: Đã xác nhận]
+        S1 --> |BS không nhận| S1
+        S1 --> |BN/BS hủy| S3[S3: Đã hủy]
+        
+        S2 --> |Khám xong| S4[S4: Hoàn thành]
+        S2 --> |BN/BS hủy| S3
+        S2 --> |No-show| S3
+    end
+    
+    subgraph TINH_HUONG["⚠️ TÌNH HUỐNG ĐẶC BIỆT"]
+        TH1[BS nghỉ ốm] --> |Chưa xác nhận| S1
+        TH1 --> |Đã xác nhận| S3
+        TH2[BN không đến] --> S3
+        TH3[Cấp cứu] --> CC[Khoa Cấp cứu]
+    end
+    
+    style A1 fill:#ccffcc
+    style S4 fill:#ccffcc
+    style S3 fill:#ffcccc
+    style CC fill:#ffffcc
+```
+
+---
+
+## 6. Tổng Kết
 
 Hệ thống Đăng Ký Lịch Khám Bệnh Trực Tuyến được thiết kế với:
 
@@ -844,4 +1015,65 @@ Hệ thống Đăng Ký Lịch Khám Bệnh Trực Tuyến được thiết kế
 
 4. **Bảo mật** với JWT authentication và Role-Based Access Control (RBAC)
 
-5. **Khả năng mở rộng** với Docker containerization và thiết kế module hóa
+5. **Xử lý tình huống đặc biệt** bao gồm:
+   - Bác sĩ nghỉ ốm: Không xác nhận hoặc hủy lịch + thông báo bệnh nhân
+   - Bệnh nhân không đến: Tự động hủy sau khung giờ quy định
+   - Race condition: Sử dụng Transaction + Row-level Locking
+   - Quy trình duyệt: Bác sĩ đăng ký >= ngày mai, Admin duyệt trong 1 ngày
+
+6. **Khả năng mở rộng** với Docker containerization và thiết kế module hóa
+
+### 6.1. Tính Năng Phát Triển Tương Lai
+
+| Tính năng | Mô tả | Ưu tiên |
+|-----------|-------|---------|
+| Thông báo Email/SMS | Gửi thông báo tự động khi có thay đổi lịch hẹn | Cao |
+| Thanh toán trực tuyến | Tích hợp cổng thanh toán (VNPay, Momo) | Trung bình |
+| Đánh giá bác sĩ | Bệnh nhân đánh giá sau khi khám | Trung bình |
+| Tư vấn trực tuyến | Video call với bác sĩ | Thấp |
+| Hồ sơ bệnh án điện tử | Lưu trữ lịch sử khám bệnh | Cao |
+
+
+---
+
+## Phụ Lục: Hướng Dẫn Cài Đặt
+
+### Yêu Cầu
+- Docker 20.10+
+- Docker Compose 2.0+
+
+### Cài Đặt Nhanh
+
+```bash
+# 1. Clone dự án
+git clone https://github.com/TongNguyenvk/CNPM_WebSiteDKKhamBenh.git
+cd CNPM_WebSiteDKKhamBenh
+
+# 2. Tạo volume database
+docker volume create websitedkkhambenh_db_data
+
+# 3. Build và chạy
+docker-compose up -d --build
+
+# 4. Kiểm tra
+docker-compose ps
+```
+
+### Truy Cập
+
+| URL | Mô tả |
+|-----|-------|
+| http://localhost:3000 | Giao diện web |
+| http://localhost:8080/api | Backend API |
+
+### Import Dữ Liệu (nếu có file dump)
+
+```bash
+docker-compose exec -T db-mysql mysql -u root -p123456 DBDKKHAMBENH < dump-DBDKKHAMBENH-*.sql
+```
+
+### Tài Khoản Mặc Định
+
+| Vai trò | Email | Mật khẩu |
+|---------|-------|----------|
+| Admin | admin@gmail.com | 123456 |

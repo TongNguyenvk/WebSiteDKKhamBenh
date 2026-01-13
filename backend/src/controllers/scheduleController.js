@@ -243,7 +243,7 @@ const createSchedule = async (req, res) => {
     }
 };
 
-// Cập nhật một schedule theo id
+// Cập nhật một schedule theo id (ĐÃ FIX: Validation + Check status)
 const updateSchedule = async (req, res) => {
     try {
         const { id } = req.params;
@@ -251,7 +251,87 @@ const updateSchedule = async (req, res) => {
 
         const schedule = await Schedule.findByPk(id);
         if (!schedule) {
-            return res.status(404).json({ message: 'Schedule không tồn tại' });
+            return res.status(404).json({ success: false, message: 'Schedule không tồn tại' });
+        }
+
+        // FIX: Không cho sửa schedule đã approved (trừ Admin)
+        const isAdmin = req.user && req.user.roleId === 'R3';
+        if (schedule.status === 'approved' && !isAdmin) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Không thể sửa lịch khám đã được duyệt' 
+            });
+        }
+
+        // FIX: Validate date format nếu có
+        if (date) {
+            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+            if (!dateRegex.test(date)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Định dạng ngày không hợp lệ. Vui lòng sử dụng YYYY-MM-DD'
+                });
+            }
+            // Không cho sửa sang ngày quá khứ
+            const newDate = new Date(date);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (newDate < today) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Không thể đặt lịch cho ngày đã qua'
+                });
+            }
+        }
+
+        // FIX: Validate maxNumber >= currentNumber
+        if (maxNumber !== undefined) {
+            if (maxNumber < 1) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Số lượng bệnh nhân tối đa phải lớn hơn 0'
+                });
+            }
+            if (maxNumber < schedule.currentNumber) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Số lượng tối đa không thể nhỏ hơn số đã đặt (${schedule.currentNumber})`
+                });
+            }
+        }
+
+        // FIX: Validate timeType nếu có
+        if (timeType) {
+            const validTimeTypes = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8'];
+            if (!validTimeTypes.includes(timeType)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Khung giờ không hợp lệ. Vui lòng chọn từ T1 đến T8'
+                });
+            }
+        }
+
+        // FIX: Check trùng lịch nếu thay đổi date hoặc timeType
+        if (date || timeType) {
+            const newDate = date || schedule.date;
+            const newTimeType = timeType || schedule.timeType;
+            const newDoctorId = doctorId || schedule.doctorId;
+            
+            const existingSchedule = await Schedule.findOne({
+                where: {
+                    doctorId: newDoctorId,
+                    date: newDate,
+                    timeType: newTimeType,
+                    id: { [Op.ne]: id } // Không tính chính nó
+                }
+            });
+
+            if (existingSchedule) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Đã tồn tại lịch khám cho bác sĩ này vào thời gian này'
+                });
+            }
         }
 
         schedule.doctorId = doctorId !== undefined ? doctorId : schedule.doctorId;
@@ -260,26 +340,50 @@ const updateSchedule = async (req, res) => {
         schedule.maxNumber = maxNumber !== undefined ? maxNumber : schedule.maxNumber;
 
         await schedule.save();
-        res.status(200).json(schedule);
+        
+        res.status(200).json({ 
+            success: true, 
+            message: 'Cập nhật lịch khám thành công',
+            data: schedule 
+        });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Lỗi server', error: error.message });
+        res.status(500).json({ success: false, message: 'Lỗi server', error: error.message });
     }
 };
 
-// Xoá một schedule theo id
+// Xoá một schedule theo id (ĐÃ FIX: Check booking active)
 const deleteSchedule = async (req, res) => {
     try {
         const { id } = req.params;
         const schedule = await Schedule.findByPk(id);
         if (!schedule) {
-            return res.status(404).json({ message: 'Schedule không tồn tại' });
+            return res.status(404).json({ success: false, message: 'Schedule không tồn tại' });
         }
+
+        // FIX: Không cho xóa schedule đã có booking active
+        const { Booking } = require('../models');
+        const activeBookings = await Booking.count({
+            where: {
+                doctorId: schedule.doctorId,
+                date: schedule.date,
+                timeType: schedule.timeType,
+                statusId: { [Op.notIn]: ['S3'] } // Không tính lịch đã hủy
+            }
+        });
+
+        if (activeBookings > 0) {
+            return res.status(400).json({ 
+                success: false, 
+                message: `Không thể xóa lịch khám này vì đang có ${activeBookings} lịch hẹn chưa hoàn thành` 
+            });
+        }
+
         await schedule.destroy();
-        res.status(200).json({ message: 'Xoá schedule thành công' });
+        res.status(200).json({ success: true, message: 'Xoá schedule thành công' });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Lỗi server', error: error.message });
+        res.status(500).json({ success: false, message: 'Lỗi server', error: error.message });
     }
 };
 
