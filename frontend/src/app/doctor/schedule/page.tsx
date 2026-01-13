@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { getDoctorSchedules, createSchedule, deleteDoctorSchedule } from '@/lib/api';
+import { getDoctorSchedules, getDoctorSchedulesRange, createSchedule, deleteDoctorSchedule } from '@/lib/api';
 import { SlidePanel, DataTable } from '@/components/ui';
 import { format, addDays, isBefore, startOfDay } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -55,6 +55,7 @@ function DoctorScheduleContent() {
     const [isPanelOpen, setIsPanelOpen] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [userId, setUserId] = useState<number | null>(null);
+    const [viewRange, setViewRange] = useState<boolean>(false);
     
     // Ngày tối thiểu là ngày mai
     const minDate = format(addDays(new Date(), 1), 'yyyy-MM-dd');
@@ -68,12 +69,19 @@ function DoctorScheduleContent() {
             setUserId(user.userId);
             fetchSchedules(user.userId);
         }
-    }, [selectedDate]);
+    }, [selectedDate, viewRange]);
 
     const fetchSchedules = async (doctorId: number) => {
         try {
             setLoading(true);
-            const data = await getDoctorSchedules(doctorId, selectedDate);
+            let data: Schedule[] = [];
+            if (viewRange) {
+                const start = format(new Date(), 'yyyy-MM-dd');
+                const end = format(addDays(new Date(), 30), 'yyyy-MM-dd');
+                data = await getDoctorSchedulesRange(doctorId, start, end, true);
+            } else {
+                data = await getDoctorSchedules(doctorId, selectedDate);
+            }
             setSchedules(data);
         } catch (error) {
             console.error('Error:', error);
@@ -202,10 +210,14 @@ function DoctorScheduleContent() {
                     <input type="date" value={selectedDate} onChange={(e) => updateUrl(e.target.value)}
                         className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
+                <div className="mt-6 flex items-center gap-2">
+                    <input id="viewRange" type="checkbox" checked={viewRange} onChange={(e) => setViewRange(e.target.checked)} />
+                    <label htmlFor="viewRange" className="text-sm text-gray-700">Hiển thị 30 ngày tới (tất cả trạng thái)</label>
+                </div>
             </div>
 
             <div className="flex-1 overflow-hidden bg-white">
-                <DataTable columns={columns} data={schedules} keyField="id" pageSize={15} emptyMessage="Không có lịch làm việc nào cho ngày này" />
+                <DataTable columns={columns} data={schedules} keyField="id" pageSize={15} emptyMessage={viewRange ? "Không có lịch làm việc nào trong 30 ngày tới" : "Không có lịch làm việc nào cho ngày này"} />
             </div>
 
             <SlidePanel isOpen={isPanelOpen} onClose={() => setIsPanelOpen(false)} title="Đăng ký lịch làm việc" width="md">

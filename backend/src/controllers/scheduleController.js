@@ -9,6 +9,8 @@ const getDoctorSchedules = async (req, res) => {
     try {
         const doctorId = Number(req.params.doctorId);
         const requestedDate = req.query.date;
+        const startDateParam = req.query.startDate; // YYYY-MM-DD
+        const endDateParam = req.query.endDate;     // YYYY-MM-DD
         const includeAll = req.query.includeAll === 'true'; // Cho phép lấy tất cả status
 
         if (isNaN(doctorId)) {
@@ -20,8 +22,31 @@ const getDoctorSchedules = async (req, res) => {
 
         let startDate, endDate;
 
-        if (requestedDate) {
-            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+        // Ưu tiên cặp tham số startDate/endDate nếu có
+        if (startDateParam || endDateParam) {
+            if (!startDateParam || !endDateParam) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Cần truyền đủ cả startDate và endDate (YYYY-MM-DD)."
+                });
+            }
+            if (!dateRegex.test(startDateParam) || !dateRegex.test(endDateParam)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Định dạng ngày không hợp lệ. Vui lòng sử dụng YYYY-MM-DD."
+                });
+            }
+            startDate = new Date(startDateParam);
+            endDate = new Date(endDateParam);
+            if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+                return res.status(400).json({ success: false, message: "Giá trị ngày không hợp lệ." });
+            }
+            if (endDate < startDate) {
+                return res.status(400).json({ success: false, message: "endDate phải >= startDate." });
+            }
+        } else if (requestedDate) {
             if (!dateRegex.test(requestedDate)) {
                 return res.status(400).json({
                     success: false,
@@ -29,25 +54,24 @@ const getDoctorSchedules = async (req, res) => {
                 });
             }
             startDate = new Date(requestedDate);
-            if (isNaN(startDate.getTime())) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Giá trị ngày không hợp lệ."
-                });
-            }
             endDate = new Date(requestedDate);
+            if (isNaN(startDate.getTime())) {
+                return res.status(400).json({ success: false, message: "Giá trị ngày không hợp lệ." });
+            }
         } else {
+            // Mặc định: hiển thị 30 ngày tới để bác sĩ có cái nhìn đầy đủ hơn
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             startDate = new Date(today);
             endDate = new Date(today);
-            endDate.setDate(today.getDate() + 3);
+            endDate.setDate(today.getDate() + 30);
         }
 
         const startQueryDate = startDate.toISOString().split('T')[0];
         const endQueryDate = endDate.toISOString().split('T')[0];
 
         console.log(`Querying schedules for doctor ${doctorId} between ${startQueryDate} and ${endQueryDate}`);
+        console.log(`includeAll parameter: ${req.query.includeAll} (type: ${typeof req.query.includeAll}), parsed: ${includeAll}`);
 
         // Điều kiện where
         const whereCondition = {
@@ -57,9 +81,12 @@ const getDoctorSchedules = async (req, res) => {
             }
         };
 
-        // Nếu không phải includeAll, chỉ lấy lịch đã approved (cho bệnh nhân xem)
+        // Nếu không phải includeAll (ví dụ: phía bệnh nhân), chỉ lấy lịch đã approved
         if (!includeAll) {
             whereCondition.status = 'approved';
+            console.log('Filtering schedules: only approved status');
+        } else {
+            console.log('Including all schedules regardless of status');
         }
 
         const schedules = await Schedule.findAll({

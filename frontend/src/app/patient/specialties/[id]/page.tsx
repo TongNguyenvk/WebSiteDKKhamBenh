@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { getSpecialtyById, getDoctorsBySpecialty, getDoctorSchedules } from '@/lib/api';
+import { getSpecialtyById, getDoctorsBySpecialty, getDoctorSchedulesForPatient } from '@/lib/api';
 import { SlidePanel } from '@/components/ui';
 import { format, addDays } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -72,7 +72,7 @@ export default function SpecialtyDetailPage() {
     const fetchSchedules = async (doctorId: number, date: string) => {
         try {
             setLoadingSchedules(true);
-            const data = await getDoctorSchedules(doctorId, date);
+            const data = await getDoctorSchedulesForPatient(doctorId, date);
             setSchedules(data);
         } catch (error) {
             setSchedules([]);

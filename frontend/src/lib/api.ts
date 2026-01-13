@@ -379,10 +379,13 @@ export const getDoctorAppointments = async (doctorId: number): Promise<Appointme
 
 export const getDoctorSchedulesPT = async (doctorId: number, date: string): Promise<Schedule[]> => {
     try {
-        const response = await apiClient.get<Schedule[]>(`/schedule/doctor/${doctorId}`, {
-            params: { date }
+        const response = await apiClient.get(`/schedule/doctor/${doctorId}`, {
+            params: { date, includeAll: 'false' }
         });
-        return response.data || [];
+        if (response.data && response.data.success && Array.isArray(response.data.data)) {
+            return response.data.data;
+        }
+        return [];
     } catch (error) {
         console.error(`Error fetching schedules for doctor ${doctorId} on ${date}:`, error);
         if (axios.isAxiosError(error) && error.response?.status === 404) {
@@ -446,15 +449,38 @@ export const getDoctorSchedules = async (
     }
 };
 
+// Lấy lịch theo khoảng thời gian (ví dụ: 30 ngày tới)
+export const getDoctorSchedulesRange = async (
+    doctorId: number,
+    startDate: string,
+    endDate: string,
+    includeAll: boolean = true
+): Promise<DoctorSchedule[]> => {
+    try {
+        const res = await apiClient.get(`/schedule/doctor/${doctorId}`, {
+            params: { startDate, endDate, includeAll: includeAll.toString() }
+        });
+        if (res.data && res.data.success) {
+            return res.data.data as DoctorSchedule[];
+        }
+        return [];
+    } catch (error: unknown) {
+        console.error('Error fetching schedules range:', error);
+        throw new Error(error instanceof Error ? error.message : 'Failed to fetch schedules range');
+    }
+};
+
 // API lấy lịch cho bệnh nhân (chỉ lấy lịch đã approved)
 export const getDoctorSchedulesForPatient = async (
     doctorId: number,
     date: string
 ): Promise<DoctorSchedule[]> => {
     try {
+        console.log(`[Patient] Fetching schedules for doctor ${doctorId} on ${date} with includeAll=false`);
         const res = await apiClient.get(`/schedule/doctor/${doctorId}`, {
             params: { date, includeAll: 'false' }
         });
+        console.log(`[Patient] Received ${res.data?.data?.length || 0} schedules:`, res.data?.data);
         if (res.data && res.data.success && Array.isArray(res.data.data)) {
             return res.data.data as DoctorSchedule[];
         }

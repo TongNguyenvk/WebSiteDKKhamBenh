@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { getAllDoctors, getDoctorSchedules } from '@/lib/api';
+import { getAllDoctors, getDoctorSchedulesForPatient } from '@/lib/api';
 import { SlidePanel, DataTable } from '@/components/ui';
 import { format, addDays } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -60,7 +60,7 @@ export default function DoctorsPage() {
     const fetchSchedules = async (doctorId: number, date: string) => {
         try {
             setLoadingSchedules(true);
-            const data = await getDoctorSchedules(doctorId, date);
+            const data = await getDoctorSchedulesForPatient(doctorId, date);
             setSchedules(data);
         } catch (error) {
             setSchedules([]);

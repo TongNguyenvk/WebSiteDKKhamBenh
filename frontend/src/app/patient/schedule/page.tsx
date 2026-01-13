@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { getDoctorSchedules, getAllDoctors } from '@/lib/api';
+import { getDoctorSchedulesForPatient, getAllDoctors } from '@/lib/api';
 import { format, addDays } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { toast } from 'react-hot-toast';
@@ -63,7 +63,7 @@ export default function PatientSchedulePage() {
     const fetchSchedules = async () => {
         try {
             setLoadingSchedules(true);
-            const data = await getDoctorSchedules(selectedDoctorId, selectedDate);
+            const data = await getDoctorSchedulesForPatient(selectedDoctorId, selectedDate);
             setSchedules(data);
         } catch (error) {
             setSchedules([]);
