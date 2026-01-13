@@ -65,8 +65,46 @@ Khi login thành công, token sẽ tự động được lưu vào biến `{{tok
 | Specialties | /specialties/:id | GET/PUT/DELETE | No/Admin |
 | Schedules | /schedule | GET/POST | No/Doctor |
 | Schedules | /schedule/doctor/:id | GET | No |
+| Schedules | /schedule/doctor/:id?includeAll=false | GET | No (Patient view) |
 | Schedules | /schedule/pending/list | GET | Admin |
 | Schedules | /schedule/:id/approve | PUT | Admin |
 | Bookings | /bookings | POST | Patient |
 | Bookings | /bookings/doctor/:id | GET | Doctor |
 | Bookings | /bookings/patient/:id | GET | Patient |
+
+### 7. Test Case: Lọc lịch theo trạng thái duyệt
+
+**Mục đích**: Đảm bảo bệnh nhân chỉ thấy lịch đã được admin duyệt
+
+**Các bước test**:
+
+1. **Login với Doctor** → Tạo lịch mới (status = pending)
+2. **Test với includeAll=true** (Doctor/Admin view):
+   - Request: `Get Doctor Schedules (with includeAll)`
+   - Kết quả: Thấy cả lịch pending và approved
+3. **Test với includeAll=false** (Patient view):
+   - Request: `Get Doctor Schedules (Patient View - Only Approved)`
+   - Kết quả: KHÔNG thấy lịch pending, chỉ thấy approved
+4. **Login với Admin** → Duyệt lịch (approve)
+5. **Test lại với includeAll=false**:
+   - Kết quả: Bây giờ thấy lịch vì đã approved
+
+**So sánh response**:
+```json
+// includeAll=true (thấy tất cả)
+{
+  "success": true,
+  "data": [
+    {"id": 1, "status": "pending", ...},
+    {"id": 2, "status": "approved", ...}
+  ]
+}
+
+// includeAll=false (chỉ approved)
+{
+  "success": true,
+  "data": [
+    {"id": 2, "status": "approved", ...}
+  ]
+}
+```

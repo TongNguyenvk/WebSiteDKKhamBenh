@@ -151,8 +151,12 @@
 "request": {"method": "GET", "url": "{{baseUrl}}/schedule/{{scheduleId}}"}
 },
 {
-"name": "Get Doctor Schedules",
-"request": {"method": "GET", "url": {"raw": "{{baseUrl}}/schedule/doctor/{{doctorId}}?date=2026-01-03&includeAll=true", "host": ["{{baseUrl}}"], "path": ["schedule","doctor","{{doctorId}}"], "query": [{"key": "date", "value": "2026-01-03"},{"key": "includeAll", "value": "true"}]}}
+"name": "Get Doctor Schedules (with includeAll)",
+"request": {"method": "GET", "url": {"raw": "{{baseUrl}}/schedule/doctor/{{doctorId}}?date=2026-01-03&includeAll=true", "host": ["{{baseUrl}}"], "path": ["schedule","doctor","{{doctorId}}"], "query": [{"key": "date", "value": "2026-01-03"},{"key": "includeAll", "value": "true", "description": "true = all schedules, false = only approved"}]}}
+},
+{
+"name": "Get Doctor Schedules (Patient View - Only Approved)",
+"request": {"method": "GET", "url": {"raw": "{{baseUrl}}/schedule/doctor/{{doctorId}}?date=2026-01-03&includeAll=false", "host": ["{{baseUrl}}"], "path": ["schedule","doctor","{{doctorId}}"], "query": [{"key": "date", "value": "2026-01-03"},{"key": "includeAll", "value": "false", "description": "Patient view - only approved schedules"}]}}
 },
 {
 "name": "Create Schedule (Doctor/Admin)",
