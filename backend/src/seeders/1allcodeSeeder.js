@@ -21,6 +21,8 @@ module.exports = {
             { keyMap: 'T4', type: 'TIME', valueEn: '11:00 - 12:00', valueVi: '11:00 - 12:00', createdAt: new Date(), updatedAt: new Date() },
             { keyMap: 'T5', type: 'TIME', valueEn: '13:00 - 14:00', valueVi: '13:00 - 14:00', createdAt: new Date(), updatedAt: new Date() },
             { keyMap: 'T6', type: 'TIME', valueEn: '14:00 - 15:00', valueVi: '14:00 - 15:00', createdAt: new Date(), updatedAt: new Date() },
+            { keyMap: 'T7', type: 'TIME', valueEn: '15:00 - 16:00', valueVi: '15:00 - 16:00', createdAt: new Date(), updatedAt: new Date() },
+            { keyMap: 'T8', type: 'TIME', valueEn: '16:00 - 17:00', valueVi: '16:00 - 17:00', createdAt: new Date(), updatedAt: new Date() },
 
             // Trạng thái booking (STATUS)
             { keyMap: 'S1', type: 'STATUS', valueEn: 'Pending', valueVi: 'Chờ xác nhận', createdAt: new Date(), updatedAt: new Date() },
